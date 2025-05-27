@@ -1,10 +1,9 @@
 'use client';
 
 import { usePathname, useSearchParams } from 'next/navigation';
-import Script from 'next/script';
 import { useEffect, useRef, Suspense } from 'react';
 import { GA_TRACKING_ID } from '@/lib/config';
-import { pageview } from '@/lib/ga';
+import { initGA, pageview } from '@/lib/ga';
 
 /**
  * Analytics tracking component that needs to be wrapped in Suspense
@@ -13,23 +12,34 @@ import { pageview } from '@/lib/ga';
 const AnalyticsTracker = () => {
     const pathname = usePathname();
     const searchParams = useSearchParams();
-    const initialLoadHandled = useRef(false);
-
+    const initializedGA = useRef(false);
     useEffect(() => {
         if (!GA_TRACKING_ID) {
             return;
         }
 
-        const url = pathname + searchParams.toString();
-
-        // The main gtag script handles the initial pageview via its 'config' command.
-        // This effect handles pageviews for subsequent client-side navigations.
-        if (initialLoadHandled.current) {
+        // Initialize GA only once
+        if (!initializedGA.current) {
+            console.log(
+                '🚀 [GA Debug] Starting Google Analytics initialization...',
+            );
+            initGA();
+            initializedGA.current = true;
+            // Track initial pageview
+            const url = pathname + searchParams.toString();
+            console.log('📍 [GA Debug] Initial page load - tracking URL:', url);
             pageview(url);
-        } else {
-            // Mark that the initial load (handled by the script) has passed.
-            initialLoadHandled.current = true;
         }
+    }, []);
+    useEffect(() => {
+        if (!GA_TRACKING_ID || !initializedGA.current) {
+            return;
+        }
+
+        const url = pathname + searchParams.toString();
+        console.log('🔄 [GA Debug] Route change detected - tracking URL:', url);
+        // Track subsequent pageviews
+        pageview(url);
     }, [pathname, searchParams]);
 
     return null;
@@ -48,28 +58,8 @@ export default function GoogleAnalytics() {
     }
 
     return (
-        <>
-            <Suspense fallback={null}>
-                <AnalyticsTracker />
-            </Suspense>
-            <Script
-                strategy='afterInteractive'
-                src={`https://www.googletagmanager.com/gtag/js?id=${GA_TRACKING_ID}`}
-            />
-            <Script
-                id='gtag-init'
-                strategy='afterInteractive'
-                dangerouslySetInnerHTML={{
-                    __html: `
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', '${GA_TRACKING_ID}', {
-              page_path: window.location.pathname + window.location.search,
-            });
-          `,
-                }}
-            />
-        </>
+        <Suspense fallback={null}>
+            <AnalyticsTracker />
+        </Suspense>
     );
 }

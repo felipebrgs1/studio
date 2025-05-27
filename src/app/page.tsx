@@ -22,7 +22,10 @@ async function getPosts(): Promise<Post[]> {
         }
         return await response.json();
     } catch (error) {
-        console.error('Network or other error fetching posts:', error);
+        console.error(
+            'Network or other error fetching posts (react-ga tracking):',
+            error,
+        );
         return []; // Return empty array on network or other errors
     }
 }
